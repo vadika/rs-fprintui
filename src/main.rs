@@ -50,7 +50,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: &str) -> Res
     let dialog_weak = dialog.downgrade();
     let window_weak = window.downgrade();
     glib::spawn_future_local(async move {
-        match proxy.enroll(finger_name).await {
+        match proxy.enroll(&finger_name).await {
             Ok(_) => {
                 if let Some(dialog) = dialog_weak.upgrade() {
                     dialog.destroy();
@@ -116,9 +116,9 @@ fn build_ui(app: &Application) {
     enroll_button.connect_clicked(move |_| {
         if let Some(window) = window_weak.upgrade() {
             if let Some(finger) = finger_selector.active_text() {
-                let finger_str = finger.as_str();
+                let finger_str = finger.to_string();
                 glib::spawn_future_local(async move {
-                    if let Err(e) = handle_enrollment(&window, finger_str).await {
+                    if let Err(e) = handle_enrollment(&window, &finger_str).await {
                         let error_dialog = gtk4::MessageDialog::new(
                             Some(&window),
                             gtk4::DialogFlags::MODAL,
