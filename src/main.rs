@@ -59,6 +59,84 @@ fn create_finger_selector() -> ComboBoxText {
     combo
 }
 
+async fn handle_verification(window: &ApplicationWindow) -> Result<()> {
+    let conn = Connection::system().await?;
+    let proxy = FprintDeviceProxy::new(&conn).await?;
+    
+    let dialog = gtk4::MessageDialog::new(
+        Some(window),
+        gtk4::DialogFlags::MODAL,
+        gtk4::MessageType::Info,
+        gtk4::ButtonsType::Cancel,
+        "Place your finger on the sensor to verify"
+    );
+    
+    let (sender, receiver) = async_channel::unbounded();
+    
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk4::ResponseType::Cancel {
+            dialog.destroy();
+        }
+    });
+    
+    dialog.show();
+    
+    // Start verification in a separate thread
+    let sender = sender.clone();
+    glib::spawn_future_local(async move {
+        let result = proxy.verify().await;
+        let _ = sender.send(result).await;
+    });
+
+    // Set up a recurring check for messages
+    let dialog_weak = dialog.downgrade();
+    let window_weak = window.downgrade();
+    glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+        let receiver = receiver.clone();
+        let dialog_weak = dialog_weak.clone();
+        let window_weak = window_weak.clone();
+        
+        glib::spawn_future_local(async move {
+            if let Ok(result) = receiver.try_recv() {
+                if let Some(dialog) = dialog_weak.upgrade() {
+                    dialog.destroy();
+                    if let Some(window) = window_weak.upgrade() {
+                        match result {
+                            Ok(_) => {
+                                let success_dialog = gtk4::MessageDialog::new(
+                                    Some(&window),
+                                    gtk4::DialogFlags::MODAL,
+                                    gtk4::MessageType::Info,
+                                    gtk4::ButtonsType::Ok,
+                                    "Verification successful!"
+                                );
+                                success_dialog.show();
+                            }
+                            Err(e) => {
+                                let error_dialog = gtk4::MessageDialog::new(
+                                    Some(&window),
+                                    gtk4::DialogFlags::MODAL,
+                                    gtk4::MessageType::Error,
+                                    gtk4::ButtonsType::Ok,
+                                    &format!("Verification failed: {}", e)
+                                );
+                                error_dialog.show();
+                            }
+                        }
+                    }
+                }
+                ControlFlow::Break
+            } else {
+                ControlFlow::Continue
+            }
+        });
+        
+        ControlFlow::Continue
+    });
+
+    Ok(())
+}
+
 async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> Result<()> {
     let conn = Connection::system().await?;
     let proxy = FprintDeviceProxy::new(&conn).await?;
@@ -198,6 +276,26 @@ fn create_page_content(title: &str, window: &ApplicationWindow, stack: &Stack) -
             },
             "Verify Fingerprint" => {
                 let verify_button = Button::with_label("Verify");
+                let window_weak = window.downgrade();
+                verify_button.connect_clicked(move |_| {
+                    if let Some(window) = window_weak.upgrade() {
+                        glib::spawn_future_local(async move {
+                            if let Err(e) = handle_verification(&window).await {
+                                let error_dialog = gtk4::MessageDialog::new(
+                                    Some(&window),
+                                    gtk4::DialogFlags::MODAL,
+                                    gtk4::MessageType::Error,
+                                    gtk4::ButtonsType::Ok,
+                                    &format!("Error: {}", e)
+                                );
+                                error_dialog.connect_response(|dialog, _| {
+                                    dialog.destroy();
+                                });
+                                error_dialog.show();
+                            }
+                        });
+                    }
+                });
                 page.append(&verify_button);
             },
             "List Fingerprints" => {
