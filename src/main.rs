@@ -44,7 +44,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
         "Place your finger on the sensor"
     );
     
-    let (sender, receiver) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+    let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
     
     dialog.connect_response(move |dialog, response| {
         if response == gtk4::ResponseType::Cancel {
@@ -91,7 +91,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
                 }
             }
         }
-        glib::Continue(false)
+        glib::ControlFlow::Continue(false)
     });
 
     Ok(())
