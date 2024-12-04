@@ -146,19 +146,21 @@ fn create_page_content(title: &str, window: &ApplicationWindow, stack: &Stack) -
     page.set_margin_top(10);
     page.set_margin_bottom(10);
 
-    let header = Box::new(Orientation::Horizontal, 10);
-    let back_button = Button::with_label("Back");
-    let title_label = Label::new(Some(title));
-    header.append(&back_button);
-    header.append(&title_label);
-    page.append(&header);
+    if title != "Main Menu" {
+        let header = Box::new(Orientation::Horizontal, 10);
+        let back_button = Button::with_label("Back");
+        let title_label = Label::new(Some(title));
+        header.append(&back_button);
+        header.append(&title_label);
+        page.append(&header);
 
-    let stack_weak = stack.downgrade();
-    back_button.connect_clicked(move |_| {
-        if let Some(stack) = stack_weak.upgrade() {
-            stack.set_visible_child_name("main");
-        }
-    });
+        let stack_weak = stack.downgrade();
+        back_button.connect_clicked(move |_| {
+            if let Some(stack) = stack_weak.upgrade() {
+                stack.set_visible_child_name("main");
+            }
+        });
+    }
 
     if title != "Main Menu" {
         let finger_label = Label::new(Some("Select finger:"));
