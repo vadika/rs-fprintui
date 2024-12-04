@@ -1,5 +1,5 @@
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label};
+use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label, Stack, StackSwitcher};
 use gtk4::glib::{self, ControlFlow};
 use libadwaita as adw;
 use anyhow::Result;
@@ -112,6 +112,77 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
     Ok(())
 }
 
+fn create_page_content(title: &str, window: &ApplicationWindow, stack: &Stack) -> Box {
+    let page = Box::new(Orientation::Vertical, 10);
+    page.set_margin_start(10);
+    page.set_margin_end(10);
+    page.set_margin_top(10);
+    page.set_margin_bottom(10);
+
+    let header = Box::new(Orientation::Horizontal, 10);
+    let back_button = Button::with_label("Back");
+    let title_label = Label::new(Some(title));
+    header.append(&back_button);
+    header.append(&title_label);
+    page.append(&header);
+
+    let stack_weak = stack.downgrade();
+    back_button.connect_clicked(move |_| {
+        if let Some(stack) = stack_weak.upgrade() {
+            stack.set_visible_child_name("main");
+        }
+    });
+
+    if title != "Main Menu" {
+        let finger_label = Label::new(Some("Select finger:"));
+        let finger_selector = create_finger_selector();
+        page.append(&finger_label);
+        page.append(&finger_selector);
+
+        match title {
+            "Enroll Fingerprint" => {
+                let enroll_button = Button::with_label("Enroll");
+                let window_weak = window.downgrade();
+                enroll_button.connect_clicked(move |_| {
+                    if let Some(window) = window_weak.upgrade() {
+                        if let Some(finger) = finger_selector.active_text() {
+                            let finger_str = finger.to_string();
+                            glib::spawn_future_local(async move {
+                                if let Err(e) = handle_enrollment(&window, finger_str).await {
+                                    let error_dialog = gtk4::MessageDialog::new(
+                                        Some(&window),
+                                        gtk4::DialogFlags::MODAL,
+                                        gtk4::MessageType::Error,
+                                        gtk4::ButtonsType::Ok,
+                                        &format!("Error: {}", e)
+                                    );
+                                    error_dialog.show();
+                                }
+                            });
+                        }
+                    }
+                });
+                page.append(&enroll_button);
+            },
+            "Verify Fingerprint" => {
+                let verify_button = Button::with_label("Verify");
+                page.append(&verify_button);
+            },
+            "List Fingerprints" => {
+                let list_button = Button::with_label("List");
+                page.append(&list_button);
+            },
+            "Delete Fingerprint" => {
+                let delete_button = Button::with_label("Delete");
+                page.append(&delete_button);
+            },
+            _ => {}
+        }
+    }
+
+    page
+}
+
 fn build_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
@@ -120,48 +191,65 @@ fn build_ui(app: &Application) {
         .default_height(300)
         .build();
 
-    let main_box = Box::new(Orientation::Vertical, 10);
-    main_box.set_margin_start(10);
-    main_box.set_margin_end(10);
-    main_box.set_margin_top(10);
-    main_box.set_margin_bottom(10);
-
-    let finger_label = Label::new(Some("Select finger:"));
-    let finger_selector = create_finger_selector();
-    let enroll_button = Button::with_label("Enroll Selected Finger");
+    let stack = Stack::new();
+    
+    // Create main menu
+    let main_page = create_page_content("Main Menu", &window, &stack);
+    
+    let enroll_button = Button::with_label("Enroll Fingerprint");
     let verify_button = Button::with_label("Verify Fingerprint");
-    let list_button = Button::with_label("List Enrolled Fingerprints");
-    let delete_button = Button::with_label("Delete Fingerprints");
+    let list_button = Button::with_label("List Fingerprints");
+    let delete_button = Button::with_label("Delete Fingerprint");
 
-    main_box.append(&finger_label);
-    main_box.append(&finger_selector);
-    main_box.append(&enroll_button);
-
-    let window_weak = window.downgrade();
+    let stack_weak = stack.downgrade();
     enroll_button.connect_clicked(move |_| {
-        if let Some(window) = window_weak.upgrade() {
-            if let Some(finger) = finger_selector.active_text() {
-                let finger_str = finger.to_string();
-                glib::spawn_future_local(async move {
-                    if let Err(e) = handle_enrollment(&window, finger_str).await {
-                        let error_dialog = gtk4::MessageDialog::new(
-                            Some(&window),
-                            gtk4::DialogFlags::MODAL,
-                            gtk4::MessageType::Error,
-                            gtk4::ButtonsType::Ok,
-                            &format!("Error: {}", e)
-                        );
-                        error_dialog.show();
-                    }
-                });
-            }
+        if let Some(stack) = stack_weak.upgrade() {
+            stack.set_visible_child_name("enroll");
         }
     });
-    main_box.append(&verify_button);
-    main_box.append(&list_button);
-    main_box.append(&delete_button);
 
-    window.set_child(Some(&main_box));
+    let stack_weak = stack.downgrade();
+    verify_button.connect_clicked(move |_| {
+        if let Some(stack) = stack_weak.upgrade() {
+            stack.set_visible_child_name("verify");
+        }
+    });
+
+    let stack_weak = stack.downgrade();
+    list_button.connect_clicked(move |_| {
+        if let Some(stack) = stack_weak.upgrade() {
+            stack.set_visible_child_name("list");
+        }
+    });
+
+    let stack_weak = stack.downgrade();
+    delete_button.connect_clicked(move |_| {
+        if let Some(stack) = stack_weak.upgrade() {
+            stack.set_visible_child_name("delete");
+        }
+    });
+
+    main_page.append(&enroll_button);
+    main_page.append(&verify_button);
+    main_page.append(&list_button);
+    main_page.append(&delete_button);
+
+    stack.add_named(&main_page, "main");
+    
+    // Create other pages
+    let enroll_page = create_page_content("Enroll Fingerprint", &window, &stack);
+    let verify_page = create_page_content("Verify Fingerprint", &window, &stack);
+    let list_page = create_page_content("List Fingerprints", &window, &stack);
+    let delete_page = create_page_content("Delete Fingerprint", &window, &stack);
+
+    stack.add_named(&enroll_page, "enroll");
+    stack.add_named(&verify_page, "verify");
+    stack.add_named(&list_page, "list");
+    stack.add_named(&delete_page, "delete");
+
+    stack.set_visible_child_name("main");
+    
+    window.set_child(Some(&stack));
     window.present();
 }
 
