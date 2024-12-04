@@ -44,17 +44,31 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
         "Place your finger on the sensor"
     );
     
+    let (sender, receiver) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+    
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk4::ResponseType::Cancel {
+            dialog.destroy();
+        }
+    });
+    
     dialog.show();
     
     // Start enrollment in a separate thread to not block the UI
     let dialog_weak = dialog.downgrade();
     let window_weak = window.downgrade();
+    let sender = sender.clone();
     glib::spawn_future_local(async move {
-        match proxy.enroll(&finger_name.as_str()).await {
-            Ok(_) => {
-                if let Some(dialog) = dialog_weak.upgrade() {
-                    dialog.destroy();
-                    if let Some(window) = window_weak.upgrade() {
+        let result = proxy.enroll(&finger_name.as_str()).await;
+        let _ = sender.send(result); // Send result back to main thread
+    });
+
+    receiver.attach(None, move |result| {
+        if let Some(dialog) = dialog_weak.upgrade() {
+            dialog.destroy();
+            if let Some(window) = window_weak.upgrade() {
+                match result {
+                    Ok(_) => {
                         let success_dialog = gtk4::MessageDialog::new(
                             Some(&window),
                             gtk4::DialogFlags::MODAL,
@@ -64,12 +78,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
                         );
                         success_dialog.show();
                     }
-                }
-            }
-            Err(e) => {
-                if let Some(dialog) = dialog_weak.upgrade() {
-                    dialog.destroy();
-                    if let Some(window) = window_weak.upgrade() {
+                    Err(e) => {
                         let error_dialog = gtk4::MessageDialog::new(
                             Some(&window),
                             gtk4::DialogFlags::MODAL,
@@ -82,6 +91,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
                 }
             }
         }
+        glib::Continue(false)
     });
 
     Ok(())
