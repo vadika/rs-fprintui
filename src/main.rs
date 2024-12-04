@@ -1,5 +1,5 @@
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label, Stack, StackSwitcher};
+use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label, Stack};
 use gtk4::glib::{self, ControlFlow};
 use libadwaita as adw;
 use anyhow::Result;
@@ -55,8 +55,8 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
     dialog.show();
     
     // Start enrollment in a separate thread to not block the UI
-    let dialog_weak = dialog.downgrade();
-    let window_weak = window.downgrade();
+    let _dialog_weak = dialog.downgrade();
+    let _window_weak = window.downgrade();
     let sender = sender.clone();
     glib::spawn_future_local(async move {
         let result = proxy.enroll(&finger_name.as_str()).await;
@@ -234,7 +234,7 @@ fn build_ui(app: &Application) {
     main_page.append(&list_button);
     main_page.append(&delete_button);
 
-    stack.add_named(&main_page, "main");
+    stack.add_named(&main_page, Some("main"));
     
     // Create other pages
     let enroll_page = create_page_content("Enroll Fingerprint", &window, &stack);
@@ -242,10 +242,10 @@ fn build_ui(app: &Application) {
     let list_page = create_page_content("List Fingerprints", &window, &stack);
     let delete_page = create_page_content("Delete Fingerprint", &window, &stack);
 
-    stack.add_named(&enroll_page, "enroll");
-    stack.add_named(&verify_page, "verify");
-    stack.add_named(&list_page, "list");
-    stack.add_named(&delete_page, "delete");
+    stack.add_named(&enroll_page, Some("enroll"));
+    stack.add_named(&verify_page, Some("verify")); 
+    stack.add_named(&list_page, Some("list"));
+    stack.add_named(&delete_page, Some("delete"));
 
     stack.set_visible_child_name("main");
     
