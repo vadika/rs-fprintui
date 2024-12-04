@@ -1,5 +1,5 @@
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label, Stack};
+use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label, Stack, Image};
 use gtk4::glib::{self, ControlFlow};
 use libadwaita as adw;
 use anyhow::Result;
@@ -19,15 +19,40 @@ trait FprintDevice {
     async fn list_enrolled_fingers(&self) -> zbus::Result<Vec<String>>;
 }
 
+fn get_finger_icon(finger: &str) -> &str {
+    match finger {
+        "left-thumb" => "input-touchpad-symbolic",
+        "left-index-finger" => "input-mouse-symbolic",
+        "left-middle-finger" => "input-keyboard-symbolic",
+        "left-ring-finger" => "input-tablet-symbolic", 
+        "left-little-finger" => "input-gaming-symbolic",
+        "right-thumb" => "input-touchpad-symbolic",
+        "right-index-finger" => "input-mouse-symbolic",
+        "right-middle-finger" => "input-keyboard-symbolic",
+        "right-ring-finger" => "input-tablet-symbolic",
+        "right-little-finger" => "input-gaming-symbolic",
+        _ => "dialog-question-symbolic"
+    }
+}
+
 fn create_finger_selector() -> ComboBoxText {
     let combo = ComboBoxText::new();
     let fingers = [
         "left-thumb", "left-index-finger", "left-middle-finger", "left-ring-finger", "left-little-finger",
         "right-thumb", "right-index-finger", "right-middle-finger", "right-ring-finger", "right-little-finger"
     ];
+    
     for finger in fingers {
-        combo.append(Some(finger), finger);
+        let icon = Image::from_icon_name(get_finger_icon(finger));
+        icon.set_pixel_size(24);
+        combo.append(Some(finger), "");
+        if let Some(cell) = combo.last_child() {
+            if let Some(box_) = cell.first_child() {
+                box_.append(&icon);
+            }
+        }
     }
+    
     combo.set_active(Some(0));
     combo
 }
