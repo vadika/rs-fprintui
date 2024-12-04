@@ -313,6 +313,12 @@ fn create_page_content(title: &str, window: &ApplicationWindow, stack: &Stack) -
     page
 }
 
+async fn get_enrolled_fingers() -> Result<Vec<String>> {
+    let conn = Connection::system().await?;
+    let proxy = FprintDeviceProxy::new(&conn).await?;
+    Ok(proxy.list_enrolled_fingers().await?)
+}
+
 fn build_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
@@ -328,8 +334,11 @@ fn build_ui(app: &Application) {
     
     let enroll_button = Button::with_label("Enroll Fingerprint");
     let verify_button = Button::with_label("Verify Fingerprint");
-    let list_button = Button::with_label("List Fingerprints");
     let delete_button = Button::with_label("Delete Fingerprint");
+
+    // Add enrolled fingers list
+    let enrolled_list = Label::new(Some("Loading enrolled fingerprints..."));
+    enrolled_list.set_margin_top(20);
 
     let stack_weak = stack.downgrade();
     enroll_button.connect_clicked(move |_| {
@@ -345,12 +354,6 @@ fn build_ui(app: &Application) {
         }
     });
 
-    let stack_weak = stack.downgrade();
-    list_button.connect_clicked(move |_| {
-        if let Some(stack) = stack_weak.upgrade() {
-            stack.set_visible_child_name("list");
-        }
-    });
 
     let stack_weak = stack.downgrade();
     delete_button.connect_clicked(move |_| {
@@ -361,20 +364,40 @@ fn build_ui(app: &Application) {
 
     main_page.append(&enroll_button);
     main_page.append(&verify_button);
-    main_page.append(&list_button);
     main_page.append(&delete_button);
+    main_page.append(&enrolled_list);
+
+    // Set up enrolled fingers list update
+    let enrolled_list_weak = enrolled_list.downgrade();
+    glib::spawn_future_local(async move {
+        match get_enrolled_fingers().await {
+            Ok(fingers) => {
+                if let Some(label) = enrolled_list_weak.upgrade() {
+                    if fingers.is_empty() {
+                        label.set_text("No fingerprints enrolled");
+                    } else {
+                        label.set_text(&format!("Enrolled fingerprints:\n{}", 
+                            fingers.join("\n")));
+                    }
+                }
+            },
+            Err(e) => {
+                if let Some(label) = enrolled_list_weak.upgrade() {
+                    label.set_text(&format!("Error loading fingerprints: {}", e));
+                }
+            }
+        }
+    });
 
     stack.add_named(&main_page, Some("main"));
     
     // Create other pages
     let enroll_page = create_page_content("Enroll Fingerprint", &window, &stack);
     let verify_page = create_page_content("Verify Fingerprint", &window, &stack);
-    let list_page = create_page_content("List Fingerprints", &window, &stack);
     let delete_page = create_page_content("Delete Fingerprint", &window, &stack);
 
     stack.add_named(&enroll_page, Some("enroll"));
     stack.add_named(&verify_page, Some("verify")); 
-    stack.add_named(&list_page, Some("list"));
     stack.add_named(&delete_page, Some("delete"));
 
     stack.set_visible_child_name("main");
