@@ -183,6 +183,9 @@ fn create_page_content(title: &str, window: &ApplicationWindow, stack: &Stack) -
                                         gtk4::ButtonsType::Ok,
                                         &format!("Error: {}", e)
                                     );
+                                    error_dialog.connect_response(|dialog, _| {
+                                        dialog.destroy();
+                                    });
                                     error_dialog.show();
                                 }
                             });
