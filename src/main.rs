@@ -32,7 +32,7 @@ fn create_finger_selector() -> ComboBoxText {
     combo
 }
 
-async fn handle_enrollment(window: &ApplicationWindow, finger_name: &str) -> Result<()> {
+async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> Result<()> {
     let conn = Connection::system().await?;
     let proxy = FprintDeviceProxy::new(&conn).await?;
     
@@ -50,7 +50,7 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: &str) -> Res
     let dialog_weak = dialog.downgrade();
     let window_weak = window.downgrade();
     glib::spawn_future_local(async move {
-        match proxy.enroll(&finger_name).await {
+        match proxy.enroll(&finger_name.as_str()).await {
             Ok(_) => {
                 if let Some(dialog) = dialog_weak.upgrade() {
                     dialog.destroy();
@@ -118,7 +118,7 @@ fn build_ui(app: &Application) {
             if let Some(finger) = finger_selector.active_text() {
                 let finger_str = finger.to_string();
                 glib::spawn_future_local(async move {
-                    if let Err(e) = handle_enrollment(&window, &finger_str).await {
+                    if let Err(e) = handle_enrollment(&window, finger_str).await {
                         let error_dialog = gtk4::MessageDialog::new(
                             Some(&window),
                             gtk4::DialogFlags::MODAL,
