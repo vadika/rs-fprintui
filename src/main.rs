@@ -1,6 +1,6 @@
 use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow, Button, Box, Orientation, ComboBoxText, Label};
-use gtk4::glib;
+use gtk4::glib::{self, ControlFlow};
 use libadwaita as adw;
 use anyhow::Result;
 use zbus::{dbus_proxy, Connection};
@@ -100,13 +100,13 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
                         }
                     }
                 }
-                glib::Continue(false) // Stop the timeout after receiving the message
+                ControlFlow::Break // Stop the timeout after receiving the message
             } else {
-                glib::Continue(true) // Keep checking for messages
+                ControlFlow::Continue // Keep checking for messages
             }
         });
         
-        glib::Continue(true)
+        ControlFlow::Continue
     });
 
     Ok(())
