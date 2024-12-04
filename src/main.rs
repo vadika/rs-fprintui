@@ -43,13 +43,13 @@ fn create_finger_selector() -> ComboBoxText {
     ];
     
     for finger in fingers {
-        let icon = Image::from_icon_name(get_finger_icon(finger));
-        icon.set_pixel_size(24);
-        combo.append(Some(finger), "");
+        combo.append(Some(finger), finger);
         if let Some(cell) = combo.last_child() {
             if let Some(box_) = cell.first_child() {
                 if let Ok(box_container) = box_.downcast::<gtk4::Box>() {
-                    box_container.append(&icon);
+                    let icon = Image::from_icon_name(get_finger_icon(finger));
+                    icon.set_pixel_size(24);
+                    box_container.prepend(&icon);
                 }
             }
         }
