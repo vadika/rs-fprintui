@@ -2,7 +2,7 @@ use gtk4::prelude::*;
 use gtk4::{Application, ApplicationWindow, Button, Box, Orientation};
 use libadwaita as adw;
 use anyhow::Result;
-use zbus::{Connection, dbus_proxy};
+use zbus::dbus_proxy;
 
 const APP_ID: &str = "org.example.fprintui";
 
@@ -27,7 +27,10 @@ fn build_ui(app: &Application) {
         .build();
 
     let main_box = Box::new(Orientation::Vertical, 10);
-    main_box.set_margin_all(10);
+    main_box.set_margin_start(10);
+    main_box.set_margin_end(10);
+    main_box.set_margin_top(10);
+    main_box.set_margin_bottom(10);
 
     let enroll_button = Button::with_label("Enroll New Fingerprint");
     let verify_button = Button::with_label("Verify Fingerprint");
