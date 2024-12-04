@@ -10,3 +10,4 @@ zbus = "3.14"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
+async-channel = "1.9"
