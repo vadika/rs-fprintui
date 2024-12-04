@@ -60,38 +60,53 @@ async fn handle_enrollment(window: &ApplicationWindow, finger_name: String) -> R
     let sender = sender.clone();
     glib::spawn_future_local(async move {
         let result = proxy.enroll(&finger_name.as_str()).await;
-        let _ = sender.send(result); // Send result back to main thread
+        let _ = sender.send(result).await; // Send result back to main thread
     });
 
-    receiver.attach(None, move |result| {
-        if let Some(dialog) = dialog_weak.upgrade() {
-            dialog.destroy();
-            if let Some(window) = window_weak.upgrade() {
-                match result {
-                    Ok(_) => {
-                        let success_dialog = gtk4::MessageDialog::new(
-                            Some(&window),
-                            gtk4::DialogFlags::MODAL,
-                            gtk4::MessageType::Info,
-                            gtk4::ButtonsType::Ok,
-                            "Enrollment successful!"
-                        );
-                        success_dialog.show();
-                    }
-                    Err(e) => {
-                        let error_dialog = gtk4::MessageDialog::new(
-                            Some(&window),
-                            gtk4::DialogFlags::MODAL,
-                            gtk4::MessageType::Error,
-                            gtk4::ButtonsType::Ok,
-                            &format!("Enrollment failed: {}", e)
-                        );
-                        error_dialog.show();
+    // Set up a recurring check for messages
+    let dialog_weak2 = dialog.downgrade();
+    let window_weak2 = window.downgrade();
+    glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+        let receiver = receiver.clone();
+        let dialog_weak = dialog_weak2.clone();
+        let window_weak = window_weak2.clone();
+        
+        glib::spawn_future_local(async move {
+            if let Ok(result) = receiver.try_recv() {
+                if let Some(dialog) = dialog_weak.upgrade() {
+                    dialog.destroy();
+                    if let Some(window) = window_weak.upgrade() {
+                        match result {
+                            Ok(_) => {
+                                let success_dialog = gtk4::MessageDialog::new(
+                                    Some(&window),
+                                    gtk4::DialogFlags::MODAL,
+                                    gtk4::MessageType::Info,
+                                    gtk4::ButtonsType::Ok,
+                                    "Enrollment successful!"
+                                );
+                                success_dialog.show();
+                            }
+                            Err(e) => {
+                                let error_dialog = gtk4::MessageDialog::new(
+                                    Some(&window),
+                                    gtk4::DialogFlags::MODAL,
+                                    gtk4::MessageType::Error,
+                                    gtk4::ButtonsType::Ok,
+                                    &format!("Enrollment failed: {}", e)
+                                );
+                                error_dialog.show();
+                            }
+                        }
                     }
                 }
+                glib::Continue(false) // Stop the timeout after receiving the message
+            } else {
+                glib::Continue(true) // Keep checking for messages
             }
-        }
-        glib::ControlFlow::Continue
+        });
+        
+        glib::Continue(true)
     });
 
     Ok(())
