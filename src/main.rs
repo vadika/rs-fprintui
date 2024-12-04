@@ -48,7 +48,9 @@ fn create_finger_selector() -> ComboBoxText {
         combo.append(Some(finger), "");
         if let Some(cell) = combo.last_child() {
             if let Some(box_) = cell.first_child() {
-                box_.append(&icon);
+                if let Ok(box_container) = box_.downcast::<gtk4::Box>() {
+                    box_container.append(&icon);
+                }
             }
         }
     }
