@@ -1,13 +1,15 @@
 [package]
-name = "rs-fprintui"
+name = "fprintui"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 gtk4 = "0.7"
 libadwaita = "0.5"
-zbus = "3.14"
+zbus = "5.5"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 async-channel = "1.9"
+whoami = "1.5.2"
+futures-util = "0.3.31"
